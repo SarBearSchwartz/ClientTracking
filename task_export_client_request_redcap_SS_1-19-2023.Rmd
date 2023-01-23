@@ -1,0 +1,40 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(redcapAPI)
+```
+
+
+
+```{r}
+setwd("C:/Users/A00315273/Documents/GitHub/ClientTracking")
+
+rcon <- redcapAPI::redcapConnection("https://redcap.cehs.usu.edu/api/", 
+                                    "3833AFDE5DB376603FBEA9747787212E")
+
+today <- Sys.Date()
+
+latest_pull_date <- data.frame(file = list.files("C:/Users/A00315273/Documents/GitHub/ClientTracking",
+                                                full.names = TRUE)) %>% 
+  dplyr::mutate(file = stringr::str_sub(file, start = 52)) %>% 
+  dplyr::filter(stringr::str_sub(file, start = -5) == "RData") %>% 
+  dplyr::filter(stringr::str_sub(file, end = 20) == "StatStudio_requests_") %>% 
+  dplyr::mutate(date = stringr::str_sub(file, start = 21, end = -7)) %>% 
+  dplyr::pull(date) %>% 
+  max()
+```
+
+
+```{r}
+if (today > latest_pull_date){
+  df_export <- redcapAPI::exportRecords(rcon)
+  save(df_export, 
+       file = glue::glue("StatStudio_requests_{Sys.Date()}.RData"))
+}
+```
+
+
