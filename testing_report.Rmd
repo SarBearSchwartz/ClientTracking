@@ -1,31 +1,11 @@
 ---
-title: "The Statistical Consulting Studio"
-subtitle: "Annual Consultation Report"
-author:   "Dr. Sarah Schwartz, Director"
-date:     "Test Time"
+title: "`r data$record_num`"
+params:
+  doc_title: "Test"
 output:
   pdf_document:
-    toc: yes
-    number_sections: false
-header-includes:
-    - \usepackage{geometry}
-      \geometry{
-        top=1in,            
-        inner=1in,
-        outer=1in,
-        bottom=1in,     
-      }
-    - \usepackage{fancyhdr}
-    - \usepackage{lipsum}
-    - \usepackage{layout}
-    
-
 ---
 
-
-```{r, include=FALSE}
-Sys.getenv("RSTUDIO_PANDOC")
-```
 
 
 
@@ -40,6 +20,19 @@ knitr::opts_chunk$set(echo = FALSE,
 ```
 
 
-# Section
+```{r}
+load("REDCap_pulls/all_clients.RData")
 
-## Subsection
+load("REDCap_pulls/all_grants.RData")
+
+load("REDCap_pulls/all_projects.RData")
+```
+
+
+```{r}
+data <- df_projects[1,]
+
+data$record_num
+```
+
+
