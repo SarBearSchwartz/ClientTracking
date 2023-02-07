@@ -1,0 +1,57 @@
+---
+title: "#`r params$record_num` - `r params$proj_type`"
+output:  pdf_document
+params:
+  record_num: "Project ID from Request From"
+  proj_title: "Working Title"
+  proj_type: "Type of Project"
+---
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 6,
+                      fig.height = 3.5,
+                      fig.pos = "hb")
+
+# install.packages("remotes")
+# remotes::install_github("gadenbuie/epoxy")
+
+library(tidyverse)
+library(epoxy)
+
+load("REDCap_pulls/all_projects.RData")
+
+df_projects <- df_projects %>% 
+  dplyr::mutate(proj_sample = as.character(proj_sample)) %>% 
+  dplyr::mutate(proj_past = as.character(proj_past)) %>% 
+  # dplyr::filter(record_num == 645)
+  dplyr::filter(record_num == params$record_num)
+```
+
+
+
+```{r}
+df_projects %>% 
+  dplyr::rename("Description" = proj_description, 
+                "Sample" = proj_sample, 
+                "Hypothesis" = proj_hypo, 
+                "Past" = proj_past) %>% 
+  tidyr::pivot_longer(cols = c(Description, Sample, Hypothesis, Past),
+                      names_to = "Background",
+                      values_to = "Provided") %>% 
+  dplyr::select(Background, Provided) %>% 
+  pander::pander()
+```
+
+
+
+
+
+
+
