@@ -1,0 +1,380 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Load packages
+library("tidyverse")
+library("REDCapR")
+library("redcapAPI")
+library("lubridate")
+library("stringr")
+library("forcats")
+library("furniture")
+library("pander")
+library("ggalt")
+```
+
+```{r, echo=FALSE}
+load("REDCap_pulls/all_worklog.RData")
+load("REDCap_pulls/all_clients.RData")
+load("REDCap_pulls/all_projects.RData")
+load("REDCap_pulls/all_grants.RData")
+```
+
+```{r}
+df_projs <- dplyr::full_join(df_projects, df_grants)
+```
+
+
+```{r}
+df <- df_clients %>% 
+  dplyr::full_join(df_projs, by = "anum") %>% 
+  dplyr::full_join(df_worklog, by = c("anum", "record_num")) %>% 
+  dplyr::mutate(proj_title = stringr::str_to_title(proj_title))
+  dplyr::filter(meet_dur > 0 | work_dur > 0)  
+  
+  
+  
+df %>%  
+  dplyr::select(record_num,
+                anum,
+                client_name_first, client_name_last,
+                client_usu_role,
+                client_dept,
+                student_degree,
+                student_mentor,
+                request_date,
+                proj_title,
+                proj_type,
+                proj_collab_who,
+                grant_fund,
+                grant_type,
+                grant_date,
+                grant_nancy,
+                grant_power,
+                meet_date,
+                meet_dur, work_dur,
+                starts_with("meet"))
+```
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+### -------------------------------------------------- ###
+### Heading for each project
+### -------------------------------------------------- ###
+
+template_employ  <- " 
+#### **%s %s** [%s] %s - %s    
+> **%s**      
+%s: *%s*
+"
+
+template_student <- "
+#### **%s %s** [%s] %s with %s    - %s    
+> **%s**      
+%s: *%s*
+"
+
+ds_request <- ds %>% 
+  mutate(bullet = ifelse(client_usu_role == role_cats[1],
+                         sprintf(template_employ,
+                                 ds$client_name_first,
+                                 ds$client_name_last,
+                                 ds$client_dept_text,
+                                 ds$employee_position_text,
+                                 ds$proj_type_text,
+                                 ds$intake_title,
+                                 ds$intake_phase,
+                                 ds$intake_notes),
+                          sprintf(template_student,
+                                  ds$client_name_first,
+                                  ds$client_name_last,
+                                  ds$client_dept_text,
+                                  ds$student_degree_text,
+                                  ds$student_mentor,
+                                  ds$proj_type_text,
+                                  ds$intake_title,
+                                  ds$intake_phase,
+                                  ds$intake_notes))) %>% 
+  filter(event == "request") %>% 
+  mutate(event_type = "Request Form") %>% 
+  select(record_num, 
+         event,
+         client_usu_role,
+         client_dept,       client_dept_text,
+         student_degree,    student_degree_text,
+         employee_position, employee_position_text,
+         proj_type,         proj_type_text,
+         bullet)
+
+#ds_request
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+### -------------------------------------------------- ###
+### LOG: prepatroy work down by consultant
+### -------------------------------------------------- ###
+
+template_work <- "
+* %s BACKGROUND WORK done by **%s** (%s hr)    \n     
+     - %s
+"
+
+ds_work <- ds %>% 
+  mutate(bullet = sprintf(template_work,
+                          ds$work_date %>% format("%b-%d (%a)"),
+                          ds$work_consult,
+                          ds$work_dur,
+                          ds$work_notes)) %>% 
+  filter(event == "cycle") %>% 
+  mutate(event_type = "Prep Work") %>% 
+  mutate(date       = work_date)  %>% 
+  mutate(dur        = work_dur) %>% 
+  mutate(consultant = work_consult) %>% 
+  select(record_num, client_usu_role, 
+         event, event_type, 
+         dur, consultant, 
+         date, bullet,
+         starts_with("work_steps"),
+         starts_with("work_methods"),
+         starts_with("work_software"))  %>% 
+  mutate(date = ymd(date)) %>% 
+  filter(date %within% interval(dt_beg, dt_end)) %>% 
+  gather(key = var,
+         value = val,
+         starts_with("work_steps"),
+         starts_with("work_methods"),
+         starts_with("work_software")) %>% 
+  mutate(var = substring(var, 6)) %>% 
+  spread(key = var,
+         value = val)
+
+#ds_work
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+### -------------------------------------------------- ###
+### LOG: meetings between consultant and client
+### -------------------------------------------------- ###
+
+template_meet <- "
+* %s CONSULTATION MEETING with **%s** (%s hr)    \n   
+    - %s at %s %s %s 
+    - Accomplished: %s
+    - Client plan: %s
+    - Consultant plan: %s
+"    
+
+ds_meet <- ds %>% 
+  mutate(bullet = sprintf(template_meet,
+                          ds$meet_date %>% format("%b-%d (%a)"),
+                          ds$meet_consult,
+                          ds$meet_dur,
+                          ds$meet_time %>% strptime("%R") %>% format("%I:%M %p"),
+                          ds$meet_loc_text,
+                          ds$meet_attend_text,
+                          ds$meet_remote_text,
+                          ds$meet_accomp,
+                          ds$meet_plan_client,
+                          ds$meet_plan_consult)) %>% 
+  filter(event == "cycle") %>% 
+  mutate(event_type = "Consultation") %>% 
+  mutate(date       = meet_date)  %>% 
+  mutate(dur        = meet_dur) %>% 
+  mutate(consultant = meet_consult) %>% 
+  select(record_num, client_usu_role, 
+         event, event_type, 
+         dur, consultant, 
+         date, bullet,
+         starts_with("meet_steps"),
+         starts_with("meet_methods"),
+         starts_with("meet_software"))  %>% 
+  filter(date %within% interval(dt_beg, dt_end)) %>% 
+  gather(key = var,
+         value = val,
+         starts_with("meet_steps"),
+         starts_with("meet_methods"),
+         starts_with("meet_software")) %>% 
+  mutate(var = substring(var, 6)) %>% 
+  spread(key = var,
+         value = val)
+
+#ds_meet
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+include <- full_join(ds_request, ds_work) %>% 
+  full_join(ds_meet) %>% 
+  mutate(event_type = event_type %>% factor(levels = c("Request Form", 
+                                                       "Prep Work", 
+                                                       "Consultation"))) %>% 
+  arrange(record_num, event, date) %>% 
+  group_by(record_num) %>% 
+  mutate(client_usu_role   = first(client_usu_role)) %>% 
+  mutate(client_dept       = first(client_dept)) %>% 
+  mutate(employee_position = first(employee_position)) %>% 
+  mutate(student_degree    = first(student_degree)) %>% 
+  mutate(proj_type         = first(proj_type)) %>% 
+  mutate(client_role_name  = ifelse(client_usu_role == 1,
+                                    employee_position,
+                                    student_degree)) %>% 
+  filter(n() > 1) %>% 
+  mutate(month = date %>% lubridate::month(label = TRUE,  abbr = FALSE)) 
+
+#include
+```
+
+## Breakdown of Hours Logged
+
+### By Department
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+include %>% 
+  filter(event == "cycle") %>% 
+  group_by(client_dept, event_type) %>% 
+  summarize(total = sum(dur, na.rm = TRUE)) %>% 
+  spread(event_type, total) %>%
+  mutate(Total = sum(`Prep Work`, Consultation, na.rm = TRUE)) %>% 
+  arrange(Total %>% desc) %>% 
+  rename(Department = client_dept) %>% 
+  pander(caption = "Hours of Services by Department")
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=5, fig.height=2, fig.align='center'}
+expand.grid(client_dept     = department_vals %>% 
+              factor(levels = department_vals,
+                     labels = department_cats),
+            event_type = c("Prep Work", "Consultation"),
+            event = "cycle",
+            dur = 0) %>% 
+  full_join(include) %>% 
+  filter(event == "cycle") %>% 
+  group_by(client_dept, event_type) %>% 
+  summarise(dur = sum(dur, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(client_dept = fct_reorder(client_dept, dur, .desc = TRUE)) %>% 
+  ggplot(mapping = aes(x     = client_dept,
+                       y     = dur,
+                     fill    = event_type)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = NULL,
+       y = "Hours",
+       fill = NULL) +
+  theme(legend.position      = c(0.95, 0.95),
+        legend.justification = c(1, 1),
+        legend.direction     = "horizontal",
+        legend.background    = element_rect(color = "black")) +
+  scale_fill_manual(values = c("gray75", "gray30"))
+```
+
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, fig.width=5, fig.height=2, fig.align='center'}
+expand.grid(client_dept     = department_vals %>% 
+              factor(levels = department_vals,
+                     labels = department_cats), 
+            client_usu_role = role_vals %>% 
+              factor(levels = role_vals,
+                     labels = role_cats),
+            event = "cycle",
+            dur = 0) %>% 
+  full_join(include) %>% 
+  filter(event == "cycle") %>% 
+  group_by(client_dept, client_usu_role) %>% 
+  summarise(dur = sum(dur)) %>% 
+  ungroup() %>% 
+  mutate(client_dept = fct_reorder(client_dept, dur, fun = sum, .desc = TRUE)) %>% 
+  arrange(client_dept) %>% 
+  ggplot(mapping = aes(x    = client_dept,
+                       y    = dur,
+                       fill = client_usu_role)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = NULL,
+       y = "Hours",
+       fill = NULL) +
+  theme(legend.position      = c(0.95, 0.95),
+        legend.justification = c(1, 1),
+        legend.direction     = "horizontal",
+        legend.background    = element_rect(color = "black")) +
+  scale_fill_manual(values = c("gray75", "gray30"))
+```
+
+
+\newpage
+
+### By Client and Project Type
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+include %>% 
+  mutate(role_all = ifelse(!is.na(employee_position),
+                           employee_position %>% as.character(), 
+                           student_degree %>% as.character()) %>% 
+           factor(levels = c(employee_cats, student_cats))) %>% 
+  filter(event == "cycle") %>% 
+  group_by(role_all, proj_type, event_type) %>% 
+  summarize(dur = sum(dur, na.rm = TRUE)) %>% 
+  spread(event_type, 
+         dur) %>%
+  mutate(Total = sum(`Prep Work`, Consultation, na.rm = TRUE)) %>%
+  rename("Role of Client" = role_all,
+         "Type of Project"  = proj_type) %>% 
+  pander(caption = "Hours of Services by Client and Project")
+```
+
+
+### By Consultant
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+include %>% 
+  filter(event == "cycle") %>% 
+  group_by(consultant, event_type) %>% 
+  summarize(dur = sum(dur, na.rm = TRUE)) %>% 
+  spread(event_type, 
+         dur) %>%
+  mutate(Total = sum(`Prep Work`, Consultation, na.rm = TRUE)) %>%
+  rename("Consultant"  = consultant) %>% 
+  pander(caption = "Hours of Services by Consultant")
+```
+
+
+\clearpage
+
+## Client Summaries
+
+### CEHS Employees
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, results="asis"}
+template <- "   
+%s"
+
+include_employees <- include %>% filter(client_usu_role == "Faculty/Staff")
+
+for (i in seq(nrow(include_employees))) {
+  cat(sprintf(template, include_employees[i, ]$bullet))
+}
+```
+
+
+### CEHS Students
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, results="asis"}
+template <- "   
+%s"
+
+include_students <- include %>% filter(client_usu_role == "Student")
+
+for (i in seq(nrow(include_students))) {
+  cat(sprintf(template, include_students[i, ]$bullet))
+}
+```
+
+

@@ -18,10 +18,12 @@ load("REDCap_pulls/all_clients.RData")
 opt_client <- df_clients %>% 
   dplyr::mutate(across(where(is.character), 
                 stringr::str_trim)) %>% 
-  dplyr::group_by(client_usu_role, client_dept) %>% 
   dplyr::arrange(desc(anum))  %>% 
-  dplyr::mutate(text = glue::glue("{stringr::str_sub(anum, start = 2)}, ({anum}) {client_name_last}, {client_name_first}")) %>% 
+  dplyr::mutate(anum9 = stringr::str_sub(anum, start = 2)) %>% 
+  dplyr::mutate(anum9 = as.numeric(anum9)+900000000) %>% 
+  dplyr::mutate(text = glue::glue("{anum9}, ({anum}) {client_name_last}, {client_name_first}")) %>% 
   dplyr::select(client_usu_role, client_dept, text) %>% 
+  dplyr::group_by(client_usu_role, client_dept) %>% 
   dplyr::summarise(client_list = paste(text, collapse = "| ")) %>% 
   dplyr::ungroup() %>% 
   dplyr::mutate(client_usu_role = client_usu_role %>% 
@@ -109,7 +111,7 @@ meta_start <- REDCapR::redcap_metadata_read(redcap_uri = "https://redcap.cehs.us
                                             token = "B67A84D215F06D379D18EF208741D354") 
 
 
-
+# View(meta_start$data)
 
 ### -------- Update MetaData-------- ###
 

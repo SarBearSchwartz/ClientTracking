@@ -70,6 +70,9 @@ save(df_export, file = glue::glue("{dir_save}/all_full_requests.RData"))
 
 
 
+max(df_export$record_num)
+
+
 ### -------- Client Database -------- ###
 
 df_clients <- df_export %>% 
@@ -186,12 +189,14 @@ save(df_projects, file = glue::glue("{dir_save}/all_projects.RData"))
 
 
 df_log <- read.csv(glue::glue("{dir_save}/StatStudio_reqest_task_log.csv")) %>% 
-  dplyr::mutate(date = as.Date(date, "%Y-%m-%d"))
+  dplyr::mutate(date = as.Date(date, "%Y-%m-%d")) %>% 
+  dplyr::mutate(max_record_num = rowsums(projects, grants, 100))
 
 log_add <- data.frame(date = today_date,
                       clients = nrow(df_clients),
                       projects = nrow(df_projects),
-                      grants = nrow(df_grants))
+                      grants = nrow(df_grants),
+                      max_record_num = max(df_export$record_num))
 
 df_newlog <- df_log %>% 
   rbind(log_add) %>% 
@@ -201,4 +206,49 @@ write.csv(df_newlog,
           file = glue::glue("{dir_save}/StatStudio_reqest_task_log.csv"),
           row.names = FALSE)
  
+
+
+
+df_new <- df_projects %>% 
+  dplyr::left_join(df_clients, by = "anum") %>% 
+  dplyr::mutate(combo = glue::glue("{record_num}_{client_dept}_{client_name_last}_{client_name_first}_{request_date}")) %>% 
+  dplyr::mutate(name = glue::glue("{client_name_first} {client_name_last}")) %>% 
+  dplyr::mutate(roll = case_when(client_usu_role == "Student" ~ 
+                                   glue::glue("{student_degree} {client_usu_role} (w/{student_mentor})"),
+                                 TRUE ~
+                                   glue::glue("{client_dept} {client_usu_role}"))) %>% 
+  dplyr::filter(record_num %in% (df_newlog$max_record_num[1]):(df_newlog$max_record_num[2]))
+
+
+
+purrr::walk(.x = df_new$combo,
+            ~ rmarkdown::render(
+              input = "index.Rmd",
+              output_file = glue::glue("request_reports/request_{.x}.pdf"),
+              params = list(record_num = df_new %>% 
+                              dplyr::filter(combo == {.x}) %>% 
+                              dplyr::pull(record_num),
+                            proj_type = df_new %>% 
+                              dplyr::filter(combo == {.x}) %>% 
+                              dplyr::pull(proj_type),
+                            proj_title = df_new %>% 
+                              dplyr::filter(combo == {.x}) %>% 
+                              dplyr::pull(proj_title),
+                            date =  df_new %>%
+                              dplyr::filter(combo == {.x}) %>%
+                              dplyr::pull(request_date),
+                            name =  df_new %>%
+                              dplyr::filter(combo == {.x}) %>%
+                              dplyr::pull(name),
+                            anum =  df_new %>%
+                              dplyr::filter(combo == {.x}) %>%
+                              dplyr::pull(anum),
+                            roll =  df_new %>%
+                              dplyr::filter(combo == {.x}) %>%
+                              dplyr::pull(roll),
+                            dept =  df_new %>%
+                              dplyr::filter(combo == {.x}) %>%
+                              dplyr::pull(client_dept))
+            )
+)
 

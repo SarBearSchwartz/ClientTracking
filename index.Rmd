@@ -1,12 +1,21 @@
 ---
-title: "#`r params$record_num` - `r params$proj_type`"
-output:  pdf_document
+title: "Request #: `r params$record_num` - `r params$dept` - `r params$proj_type`"
+subtitle: "`r params$proj_title`"
+author: "`r params$name` [`r params$anum`] - `r params$roll`"
+date: "`r format(params$date, '%B %d, %Y')`"
+output:  
+  pdf_document:
+    latex_engine: xelatex
 params:
+  date: "Request Date"
+  name: "Client's Name"
+  anum: "Client's A-number"
+  roll: "Client's Roll at USU"
+  dept: "Client's Department"
   record_num: "Project ID from Request From"
-  proj_title: "Working Title"
-  proj_type: "Type of Project"
+  proj_title: "Project Title"
+  proj_type: "Project Type"
 ---
-
 
 
 
@@ -14,6 +23,7 @@ params:
 knitr::opts_chunk$set(echo = FALSE, 
                       warning = FALSE, 
                       message = FALSE,
+                      comment = FALSE,
                       fig.align = "center",
                       fig.width = 6,
                       fig.height = 3.5,
@@ -24,34 +34,83 @@ knitr::opts_chunk$set(echo = FALSE,
 
 library(tidyverse)
 library(epoxy)
+library(tikzDevice)
 
 load("REDCap_pulls/all_projects.RData")
+load("REDCap_pulls/all_clients.RData")
 
-df_projects <- df_projects %>% 
+df <- df_projects %>% 
+  dplyr::left_join(df_clients, by = "anum") %>% 
   dplyr::mutate(proj_sample = as.character(proj_sample)) %>% 
   dplyr::mutate(proj_past = as.character(proj_past)) %>% 
-  # dplyr::filter(record_num == 645)
+  # dplyr::filter(record_num == 651)
   dplyr::filter(record_num == params$record_num)
 ```
 
 
 
-```{r}
-df_projects %>% 
-  dplyr::rename("Description" = proj_description, 
-                "Sample" = proj_sample, 
-                "Hypothesis" = proj_hypo, 
-                "Past" = proj_past) %>% 
-  tidyr::pivot_longer(cols = c(Description, Sample, Hypothesis, Past),
-                      names_to = "Background",
-                      values_to = "Provided") %>% 
-  dplyr::select(Background, Provided) %>% 
-  pander::pander()
+### Background
+
+```{r, results='asis'}
+df %>% 
+  dplyr::pull(proj_description) %>% 
+  tikzDevice::sanitizeTexString() %>% 
+  cat(sep = "  \n  ") 
+```
+
+
+### Sample 
+
+```{r, results='asis'}
+df %>% 
+  dplyr::mutate(proj_sample = proj_sample %>% 
+                  stringr::str_replace(pattern = "≈", replacement = " about ")) %>% 
+  dplyr::pull(proj_sample) %>% 
+  tikzDevice::sanitizeTexString() %>%
+  cat(sep = "  \n  ") 
+```
+
+
+
+### Hypothesis
+
+```{r, results='asis'}
+df %>% 
+  dplyr::pull(proj_hypo) %>% 
+  tikzDevice::sanitizeTexString() %>% 
+  cat(sep = "  \n  ") 
+```
+
+
+
+### Progress
+
+```{r, results='asis'}
+df %>% 
+  dplyr::pull(proj_past) %>% 
+  tikzDevice::sanitizeTexString() %>% 
+  cat(sep = "  \n  ") 
+```
+
+
+
+### Request
+
+```{r, results='asis'}
+df %>% 
+  dplyr::pull(proj_help) %>% 
+  tikzDevice::sanitizeTexString() %>% 
+  cat(sep = "  \n  ") 
 ```
 
 
 
 
+### Timeline
 
-
-
+```{r, results='asis'}
+df %>% 
+  dplyr::pull(proj_time) %>% 
+  tikzDevice::sanitizeTexString() %>% 
+  cat(sep = "  \n  ") 
+```

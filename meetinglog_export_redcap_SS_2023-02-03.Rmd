@@ -1,0 +1,70 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidyverse)
+library(furniture)
+library(pander)
+library(redcapAPI)
+library(naniar)
+```
+
+
+```{r}
+rcon <- redcapAPI::redcapConnection("https://redcap.cehs.usu.edu/api/", 
+                                    "B67A84D215F06D379D18EF208741D354")
+
+df_pull <- redcapAPI::exportRecords(rcon, factors = TRUE)
+```
+
+
+```{r}
+df_worklog <- df_pull %>% 
+  dplyr::mutate(meet_date = as.Date(meet_date)) %>%
+  dplyr::mutate(across(c(record_id, meet_dur, work_dur),
+                as.numeric)) %>%
+  dplyr::mutate(across(c(meet_dur, work_dur),
+                ~ ifelse(is.na(.x), 0, .x))) %>%
+  dplyr::mutate(across(where(is.factor),
+                       as.character)) %>%
+  tidyr::unite(col = "client",
+               starts_with("client_fac_"),
+               starts_with("client_std"),
+               na.rm = TRUE) %>%
+  tidyr::unite(col = "project",
+               starts_with("project_pub_"),
+               starts_with("project_diss_"),
+               starts_with("project_thesis_"),
+               starts_with("project_grant_"),
+               starts_with("project_other_"),
+               na.rm = TRUE) %>%
+  dplyr::mutate(anum = stringr::str_sub(client, start = 2, end = 10)) %>% 
+  dplyr::mutate(across(c(meet_plan_client, meet_plan_consult),
+                       ~ ifelse(.x == "NA", NA, .x))) %>% 
+  dplyr::mutate(across(c(meet_consult, anum, 
+                         meet_loc, meet_intake, meet_mentor, meet_attend, meet_phase),
+                factor)) %>% 
+  dplyr::mutate(record_num = stringr::str_sub(project, start = 2, end = 4)) %>% 
+  dplyr::mutate(record_num = as.numeric(record_num)) %>% 
+  dplyr::arrange(desc(record_id)) %>% 
+  dplyr::select(record_id,
+                record_num,
+                anum,
+                meet_consult,
+                meet_date,
+                meet_dur,
+                work_dur,
+                starts_with("meet"))
+```
+
+
+
+```{r}
+save(df_worklog,
+     file = "REDCap_pulls/all_worklog.RData")
+```
+
