@@ -19,3 +19,6 @@ psych
 pander
 xtable
 redcapAPI
+Matrix
+lme4
+lmerTest

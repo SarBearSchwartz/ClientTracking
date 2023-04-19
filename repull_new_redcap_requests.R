@@ -151,7 +151,6 @@ df_projects <- df_export %>%
                                      !is.na(proj_file4))) %>% 
   dplyr::ungroup() %>% 
   tidyr::unite(col = "proj_hypo",
-               proj_hypo, 
                proj_hypo2,
                sep = ", ", 
                remove = TRUE, 
@@ -223,7 +222,7 @@ df_new <- df_projects %>%
 
 purrr::walk(.x = df_new$combo,
             ~ rmarkdown::render(
-              input = "index.Rmd",
+              input = "C:/Users/A00315273/Documents/GitHub/ClientTracking/index.Rmd",
               output_file = glue::glue("request_reports/request_{.x}.pdf"),
               params = list(record_num = df_new %>% 
                               dplyr::filter(combo == {.x}) %>% 
